@@ -4,8 +4,11 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Development-only fallback. Production must set JWT_SECRET_KEY explicitly.
+_DEV_JWT_SECRET = "dev-insecure-secret-change-me-in-production"
 
 # libpq query parameters that asyncpg does not understand.
 _UNSUPPORTED_ASYNCPG_PARAMS = {"sslmode", "channel_binding"}
@@ -47,10 +50,21 @@ class Settings(BaseSettings):
     # Echo SQL statements to the log (noisy, useful for debugging).
     database_echo: bool = False
 
+    jwt_secret_key: SecretStr = SecretStr(_DEV_JWT_SECRET)
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
+
     @field_validator("database_url")
     @classmethod
     def _normalize_database_url(cls, value: str) -> str:
         return normalize_database_url(value)
+
+    @model_validator(mode="after")
+    def _require_real_secret_in_production(self) -> "Settings":
+        secret = self.jwt_secret_key.get_secret_value()
+        if self.environment == "production" and (secret == _DEV_JWT_SECRET or len(secret) < 32):
+            raise ValueError("JWT_SECRET_KEY must be set to a random value of 32+ characters")
+        return self
 
 
 @lru_cache

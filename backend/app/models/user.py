@@ -24,5 +24,11 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     role: Mapped[UserRole] = mapped_column(enum_column(UserRole, "user_role"), index=True)
     is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
 
-    business: Mapped["Business | None"] = relationship(back_populates="owner")
-    driver: Mapped["Driver | None"] = relationship(back_populates="user")
+    # Profiles are owned by the user. Deletion is left to the database's
+    # ON DELETE CASCADE instead of the ORM nulling out the foreign key.
+    business: Mapped["Business | None"] = relationship(
+        back_populates="owner", cascade="all, delete-orphan", passive_deletes=True
+    )
+    driver: Mapped["Driver | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
