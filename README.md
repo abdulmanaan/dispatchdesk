@@ -38,4 +38,4 @@ cp .env.example .env
 docker compose up -d
 ```
 
-This starts PostgreSQL (`localhost:5432`, plus a `dispatchdesk_test` database) and Redis (`localhost:6379`).
+This starts PostgreSQL (`localhost:5433`, plus a `dispatchdesk_test` database) and Redis (`localhost:6379`).
