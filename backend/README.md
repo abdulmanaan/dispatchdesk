@@ -27,6 +27,24 @@ uv run python -m app.scripts.create_admin --email admin@example.com --name "Admi
 docker compose exec backend python -m app.scripts.create_admin --email admin@example.com
 ```
 
+## Background jobs
+
+Three jobs run on every cycle (`app/jobs/tasks.py`):
+
+1. **Expire unaccepted assignments**: orders assigned more than `ACCEPTANCE_TIMEOUT_SECONDS`
+   ago and still not accepted go back to `pending` and are re-dispatched. The driver
+   is set offline and never offered that order again.
+2. **Retry pending orders**: dispatch orders that were created while no driver was free.
+3. **Flag overdue orders**: open orders past `deliver_by` get `is_overdue = true`.
+
+All jobs are safe to run concurrently (row locks with `SKIP LOCKED`, atomic updates).
+
+- **Locally**: the `worker` service in docker-compose runs them every `JOBS_INTERVAL_SECONDS`
+  (`uv run python -m app.jobs.worker` outside Docker).
+- **Production**: set `JOBS_TOKEN` and have a scheduler call
+  `POST /internal/jobs/run` with header `X-Jobs-Token: <token>`. The endpoint returns 404
+  while `JOBS_TOKEN` is unset.
+
 ## Tests and linting
 
 Requires the Postgres container from the root `docker-compose.yml` (it creates the `dispatchdesk_test` database).

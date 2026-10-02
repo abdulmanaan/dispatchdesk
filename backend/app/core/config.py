@@ -68,6 +68,17 @@ class Settings(BaseSettings):
     dispatch_workload_window_hours: int = 8
     dispatch_workload_penalty_km: float = 1.0
 
+    # --- Background jobs ---
+    # An assigned order not accepted within this time is taken back and reassigned.
+    acceptance_timeout_seconds: int = 180
+    # How often the local worker runs the jobs.
+    jobs_interval_seconds: int = 30
+    # Max orders each job handles per run (keeps one run short).
+    jobs_batch_size: int = 50
+    # Shared secret for POST /internal/jobs/run (used by an external scheduler in
+    # production). The endpoint is disabled while this is unset.
+    jobs_token: SecretStr | None = None
+
     @field_validator("database_url")
     @classmethod
     def _normalize_database_url(cls, value: str) -> str:

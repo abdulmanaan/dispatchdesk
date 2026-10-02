@@ -1,5 +1,4 @@
-# Local development stack: PostgreSQL, Redis and the FastAPI backend.
-# The worker service is added in a later step.
+# Local development stack: PostgreSQL, Redis, the FastAPI backend and the jobs worker.
 
 services:
   postgres:
@@ -48,6 +47,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Runs the background jobs (reassign unaccepted orders, retry pending dispatch,
+  # flag overdue deliveries) every JOBS_INTERVAL_SECONDS.
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dispatchdesk}:${POSTGRES_PASSWORD:-dispatchdesk}@postgres:5432/${POSTGRES_DB:-dispatchdesk}
+      JOBS_INTERVAL_SECONDS: ${JOBS_INTERVAL_SECONDS:-30}
+      ACCEPTANCE_TIMEOUT_SECONDS: ${ACCEPTANCE_TIMEOUT_SECONDS:-180}
+    command: python -m app.jobs.worker
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # The backend applies migrations on start.
+      backend:
+        condition: service_started
 
 volumes:
   postgres_data:

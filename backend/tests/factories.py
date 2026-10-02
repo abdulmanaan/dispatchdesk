@@ -16,8 +16,9 @@ from app.models.enums import (
     UserRole,
     VehicleType,
 )
+from app.services.geo import KM_PER_DEGREE_LAT
 
-# Liberty Market, Lahore: a convenient default coordinate.
+# Liberty Market, Lahore: the default business location and order pickup point.
 LAHORE_LAT, LAHORE_LNG = 31.5104, 74.3416
 
 
@@ -128,3 +129,14 @@ async def assign_order(
     )
     driver.status = DriverStatus.BUSY
     await session.flush()
+
+
+def at_km_north(km: float) -> dict[str, float]:
+    """Driver location fields ``km`` kilometres north of the default pickup point."""
+    return {"current_lat": LAHORE_LAT + km / KM_PER_DEGREE_LAT, "current_lng": LAHORE_LNG}
+
+
+async def add_driver(session: AsyncSession, km: float, **overrides: Any) -> Driver:
+    """An available driver ``km`` north of the default pickup, with a fresh location."""
+    values = {"location_updated_at": datetime.now(UTC), **at_km_north(km)} | overrides
+    return await create_driver(session, **values)

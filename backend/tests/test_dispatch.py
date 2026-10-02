@@ -14,8 +14,9 @@ from app.db.session import SessionLocal
 from app.models import AuditLog, Driver, Order, OrderAssignment
 from app.models.enums import AssignmentStatus, DriverStatus, OrderStatus, UserRole
 from app.services.dispatch import DispatchOutcome, dispatch_pending_orders, try_dispatch_order
-from app.services.geo import KM_PER_DEGREE_LAT
 from tests.factories import (
+    add_driver,
+    at_km_north,
     auth_headers,
     business_headers,
     create_business,
@@ -25,23 +26,9 @@ from tests.factories import (
     driver_headers,
 )
 
-# Pickup at Liberty Market (factory default). Driver positions are offsets from it:
-# one degree of latitude is roughly 111 km.
-PICKUP_LAT, PICKUP_LNG = 31.5104, 74.3416
-
-
-def at_km_north(km: float) -> dict[str, float]:
-    return {"current_lat": PICKUP_LAT + km / KM_PER_DEGREE_LAT, "current_lng": PICKUP_LNG}
-
 
 async def fresh(session: AsyncSession, model: type, obj_id: object):
     return await session.get(model, obj_id, populate_existing=True)
-
-
-async def add_driver(session: AsyncSession, km: float, **overrides: object) -> Driver:
-    """An available driver ``km`` north of the pickup with a fresh location."""
-    values = {"location_updated_at": datetime.now(UTC), **at_km_north(km)} | overrides
-    return await create_driver(session, **values)
 
 
 async def add_completed_deliveries(session: AsyncSession, driver: Driver, count: int) -> None:

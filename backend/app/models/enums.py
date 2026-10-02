@@ -41,6 +41,8 @@ class OrderStatus(StrEnum):
 
 # Statuses in which an order occupies its driver.
 ACTIVE_ORDER_STATUSES = (OrderStatus.ASSIGNED, OrderStatus.PICKED_UP)
+# Statuses in which an order is not finished yet.
+OPEN_ORDER_STATUSES = (OrderStatus.PENDING, *ACTIVE_ORDER_STATUSES)
 
 
 class AssignmentStatus(StrEnum):

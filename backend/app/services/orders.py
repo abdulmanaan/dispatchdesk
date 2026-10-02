@@ -168,15 +168,18 @@ async def release_driver(
     driver_id: uuid.UUID,
     outcome: AssignmentStatus,
     now: datetime,
-) -> None:
-    """Close the order's open assignment (with ``outcome``) and free a busy driver.
+    driver_status: DriverStatus = DriverStatus.AVAILABLE,
+) -> Driver | None:
+    """Close the order's open assignment (with ``outcome``) and release a busy driver.
 
-    Call only while holding the order's row lock (see the locking rule above).
+    The driver moves to ``driver_status`` (available by default). Call only while
+    holding the order's row lock (see the locking rule above).
     """
     await _set_assignment_status(session, order_id, outcome, ended_at=now)
     driver = await session.get(Driver, driver_id, with_for_update=True, populate_existing=True)
     if driver is not None and driver.status == DriverStatus.BUSY:
-        driver.status = DriverStatus.AVAILABLE
+        driver.status = driver_status
+    return driver
 
 
 async def cancel_order(
