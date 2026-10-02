@@ -1,0 +1,72 @@
+@import "tailwindcss";
+@import "@fontsource-variable/onest";
+
+/*
+ * Grove design tokens.
+ * Light first, one typeface, one accent (evergreen). Status colours are soft
+ * pills and stay separate from the accent: "delivered" is a muted grey-green so
+ * finished work never looks like something to press.
+ */
+@theme {
+  --font-sans: "Onest Variable", "Segoe UI", system-ui, sans-serif;
+
+  --color-page: #f3f5f2;
+  --color-card: #ffffff;
+  --color-ink: #1c2420;
+  --color-muted: #69736d;
+  --color-line: #e2e7e2;
+  --color-subtle: #f7f9f7;
+
+  --color-accent: #1f6b4f;
+  --color-accent-hover: #185a42;
+  --color-accent-soft: #e4efe9;
+
+  --color-danger: #b93a26;
+  --color-danger-soft: #fbe9e5;
+
+  /* Status pills: background / text pairs. */
+  --color-pending-bg: #eef0ee;
+  --color-pending-fg: #535c57;
+  --color-waiting-bg: #fdf1d8;
+  --color-waiting-fg: #855200;
+  --color-moving-bg: #e6eefa;
+  --color-moving-fg: #2a55a3;
+  --color-done-bg: #edf0ed;
+  --color-done-fg: #66736b;
+  --color-failed-bg: #fbe9e5;
+  --color-failed-fg: #a83420;
+
+  --radius-card: 22px;
+  --radius-control: 12px;
+
+  --shadow-card: 0 1px 3px rgb(28 36 32 / 0.05), 0 8px 24px rgb(28 36 32 / 0.04);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-page font-sans text-ink;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

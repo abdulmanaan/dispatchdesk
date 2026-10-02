@@ -1,4 +1,5 @@
-# Local development stack: PostgreSQL, Redis, the FastAPI backend and the jobs worker.
+# Local development stack: PostgreSQL, Redis, the FastAPI backend, the jobs worker
+# and the Vite dev server for the frontend.
 
 services:
   postgres:
@@ -72,5 +73,21 @@ services:
       backend:
         condition: service_started
 
+  frontend:
+    image: node:24-alpine
+    working_dir: /app
+    # node_modules lives in a named volume so the host's (macOS) build is never used inside Linux.
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
+  frontend_node_modules:

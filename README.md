@@ -20,7 +20,7 @@ A local delivery dispatch and driver management system. Small businesses (restau
 | -------- | ----------------------------------------------------------- |
 | Backend  | Python 3.12, FastAPI, SQLAlchemy (async), Alembic, uv       |
 | Data     | PostgreSQL (Neon in production), Redis                      |
-| Frontend | React, Vite, Tailwind CSS                                   |
+| Frontend | React, TypeScript, Vite, Tailwind CSS, React Router, TanStack Query |
 | Dev      | Docker Compose                                              |
 
 ## Repository layout
@@ -35,7 +35,28 @@ docker/     Local infrastructure helpers
 
 ```bash
 cp .env.example .env
+cp backend/.env.example backend/.env
 docker compose up -d
 ```
 
-This starts PostgreSQL (`localhost:5433`, plus a `dispatchdesk_test` database) and Redis (`localhost:6379`).
+| Service  | URL                          | Notes                                        |
+| -------- | ---------------------------- | -------------------------------------------- |
+| Frontend | http://localhost:5173        | Vite dev server; `/api` is proxied to the backend |
+| Backend  | http://localhost:8000/docs   | Interactive API docs                         |
+| Postgres | `localhost:5433`             | Also creates `dispatchdesk_test` for tests   |
+| Redis    | `localhost:6379`             | Cache and rate limits                        |
+
+The `worker` service runs the background jobs. Create a first admin with
+`docker compose exec backend python -m app.scripts.create_admin --email you@example.com`.
+
+See [backend/README.md](backend/README.md) for API details.
+
+### Frontend without Docker
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173, proxies /api to localhost:8000
+npm test           # unit and component tests (Vitest)
+npm run lint && npm run typecheck
+```
