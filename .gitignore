@@ -1,0 +1,29 @@
+# --- Claude / editor tooling ---
+CLAUDE.md
+.claude/
+.vscode/
+.idea/
+.DS_Store
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+.vite/
+*.log
+.vercel/
