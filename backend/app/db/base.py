@@ -21,3 +21,7 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
     # All datetimes are stored as TIMESTAMPTZ (timezone-aware, UTC on the wire).
     type_annotation_map = {datetime: DateTime(timezone=True)}
+    # Fetch server-generated values (e.g. updated_at = now()) via RETURNING right
+    # after INSERT/UPDATE. Otherwise they are expired and lazily reloaded, which is
+    # not allowed under asyncio.
+    __mapper_args__ = {"eager_defaults": True}

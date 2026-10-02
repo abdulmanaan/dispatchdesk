@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
 
+    # Default delivery deadline (minutes after creation) when a business omits one.
+    default_delivery_window_minutes: int = 60
+
     @field_validator("database_url")
     @classmethod
     def _normalize_database_url(cls, value: str) -> str:

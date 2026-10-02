@@ -6,8 +6,10 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Business, Driver, Order, User
+from app.core.security import create_access_token
+from app.models import Business, Driver, Order, OrderAssignment, User
 from app.models.enums import (
+    AssignmentStatus,
     BusinessCategory,
     DriverStatus,
     OrderStatus,
@@ -91,3 +93,38 @@ def active_order_fields(driver: Driver, status: OrderStatus = OrderStatus.ASSIGN
     if status != OrderStatus.ASSIGNED:
         fields["accepted_at"] = now
     return fields
+
+
+def auth_headers(user_id: Any, role: UserRole) -> dict[str, str]:
+    """Bearer headers for a user, minted directly (no login round-trip)."""
+    return {"Authorization": f"Bearer {create_access_token(user_id, role)}"}
+
+
+def business_headers(business: Business) -> dict[str, str]:
+    return auth_headers(business.owner_id, UserRole.BUSINESS)
+
+
+def driver_headers(driver: Driver) -> dict[str, str]:
+    return auth_headers(driver.user_id, UserRole.DRIVER)
+
+
+async def assign_order(
+    session: AsyncSession, order: Order, driver: Driver, *, accepted: bool = False
+) -> None:
+    """Put an order into the assigned state the way dispatch will: order, assignment, driver."""
+    now = datetime.now(UTC)
+    order.status = OrderStatus.ASSIGNED
+    order.driver_id = driver.id
+    order.assigned_at = now
+    order.accepted_at = now if accepted else None
+    order.assignment_attempts += 1
+    session.add(
+        OrderAssignment(
+            order_id=order.id,
+            driver_id=driver.id,
+            status=AssignmentStatus.ACCEPTED if accepted else AssignmentStatus.OFFERED,
+            accepted_at=order.accepted_at,
+        )
+    )
+    driver.status = DriverStatus.BUSY
+    await session.flush()
