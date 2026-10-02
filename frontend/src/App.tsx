@@ -5,8 +5,12 @@ import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth, RequireRole, RoleRedirect } from './auth/guards'
 import { AppShell } from './components/AppShell'
 import { ApiError } from './lib/api'
+import { AdminActivity } from './pages/admin/AdminActivity'
+import { AdminDrivers } from './pages/admin/AdminDrivers'
 import { AdminHome } from './pages/admin/AdminHome'
-import { BusinessHome } from './pages/business/BusinessHome'
+import { AdminOrders } from './pages/admin/AdminOrders'
+import { BusinessOrders } from './pages/business/BusinessOrders'
+import { NewOrderPage } from './pages/business/NewOrderPage'
 import { DriverHome } from './pages/driver/DriverHome'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -30,12 +34,29 @@ const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <RoleRedirect /> },
-          { element: <RequireRole role="admin" />, children: [{ path: 'admin', element: <AdminHome /> }] },
           {
-            element: <RequireRole role="business" />,
-            children: [{ path: 'business', element: <BusinessHome /> }],
+            path: 'admin',
+            element: <RequireRole role="admin" />,
+            children: [
+              { index: true, element: <AdminHome /> },
+              { path: 'orders', element: <AdminOrders /> },
+              { path: 'drivers', element: <AdminDrivers /> },
+              { path: 'activity', element: <AdminActivity /> },
+            ],
           },
-          { element: <RequireRole role="driver" />, children: [{ path: 'driver', element: <DriverHome /> }] },
+          {
+            path: 'business',
+            element: <RequireRole role="business" />,
+            children: [
+              { index: true, element: <BusinessOrders /> },
+              { path: 'new', element: <NewOrderPage /> },
+            ],
+          },
+          {
+            path: 'driver',
+            element: <RequireRole role="driver" />,
+            children: [{ index: true, element: <DriverHome /> }],
+          },
         ],
       },
     ],

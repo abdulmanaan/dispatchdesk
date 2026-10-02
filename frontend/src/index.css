@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "@fontsource-variable/onest";
+@import 'tailwindcss';
+@import '@fontsource-variable/onest';
 
 /*
  * Grove design tokens.
@@ -8,7 +8,7 @@
  * finished work never looks like something to press.
  */
 @theme {
-  --font-sans: "Onest Variable", "Segoe UI", system-ui, sans-serif;
+  --font-sans: 'Onest Variable', 'Segoe UI', system-ui, sans-serif;
 
   --color-page: #f3f5f2;
   --color-card: #ffffff;

@@ -45,10 +45,17 @@ function renderApp(initialPath = '/login') {
   )
 }
 
-function respondWith(status: number, body: unknown) {
+/** Stub fetch: /auth/demo answers with ``demo``, every other call with ``body``. */
+function respondWith(status: number, body: unknown, demo: unknown = { enabled: false, accounts: [] }) {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status })),
+    vi.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith('/auth/demo')
+          ? new Response(JSON.stringify(demo), { status: 200 })
+          : new Response(JSON.stringify(body), { status }),
+      ),
+    ),
   )
 }
 
@@ -76,6 +83,40 @@ describe('LoginPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email or password')
+  })
+
+  it('offers one-click demo logins when the backend has demo mode on', async () => {
+    const demo = {
+      enabled: true,
+      accounts: [
+        { role: 'admin', full_name: 'Ayesha Siddiqui', description: 'See every order.' },
+        { role: 'business', full_name: 'Hamza Butt', description: 'Create orders.' },
+      ],
+    }
+    respondWith(
+      200,
+      { access_token: 'demo', token_type: 'bearer', expires_in: 3600, user: businessUser },
+      demo,
+    )
+    renderApp()
+
+    const businessDemo = await screen.findByRole('button', { name: 'Open the business demo as Hamza Butt' })
+    expect(screen.getByRole('button', { name: 'Open the admin demo as Ayesha Siddiqui' })).toBeInTheDocument()
+    expect(businessDemo).toHaveAccessibleDescription('Create orders.')
+    await userEvent.click(businessDemo)
+
+    expect(await screen.findByText('Business home')).toBeInTheDocument()
+    const calls = vi.mocked(fetch).mock.calls as unknown as [string, RequestInit][]
+    const login = calls.find(([url]) => url.endsWith('/auth/demo-login'))
+    expect(JSON.parse(String(login?.[1].body))).toEqual({ role: 'business' })
+  })
+
+  it('hides demo logins when demo mode is off', async () => {
+    respondWith(200, {})
+    renderApp()
+
+    await screen.findByRole('heading', { name: 'Sign in' })
+    expect(screen.queryByText(/try the demo/i)).not.toBeInTheDocument()
   })
 
   it('sends signed-out visitors of protected pages to login', async () => {

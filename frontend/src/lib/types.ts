@@ -91,3 +91,45 @@ export interface StatsOverview {
   }
   generated_at: string
 }
+
+export interface OrderDetail extends Order {
+  business: { id: string; name: string; phone: string }
+  driver: { id: string; full_name: string; phone: string; vehicle_type: VehicleType } | null
+}
+
+export interface DriverAdmin {
+  id: string
+  user_id: string
+  full_name: string
+  email: string
+  phone: string
+  vehicle_type: VehicleType
+  status: DriverStatus
+  current_lat: number | null
+  current_lng: number | null
+  location_updated_at: string | null
+  active_order_id: string | null
+  created_at: string
+}
+
+export interface AuditEntry {
+  id: number
+  actor_id: string | null
+  actor_email: string | null
+  actor_name: string | null
+  action: string
+  entity_type: string
+  entity_id: string | null
+  details: Record<string, unknown>
+  created_at: string
+}
+
+export interface DemoInfo {
+  enabled: boolean
+  accounts: { role: Role; full_name: string; description: string }[]
+}
+
+export interface DispatchResult {
+  result: { outcome: string; driver_id: string | null; distance_km: number | null }
+  order: Order
+}
