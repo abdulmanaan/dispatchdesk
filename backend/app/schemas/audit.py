@@ -15,6 +15,7 @@ class AuditLogRead(BaseModel):
     id: int
     actor_id: uuid.UUID | None  # None means the system (dispatch, background jobs)
     actor_email: str | None = None
+    actor_name: str | None = None
     action: str
     entity_type: str
     entity_id: str | None

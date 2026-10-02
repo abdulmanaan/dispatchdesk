@@ -6,7 +6,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from app.models.enums import OrderStatus
+from app.models.enums import OrderStatus, VehicleType
 from app.schemas.common import Latitude, Longitude, NonEmptyStr, Phone
 from app.schemas.pagination import PageParams
 
@@ -99,3 +99,23 @@ class OrderListParams(PageParams):
     # Case-insensitive match on customer name, customer phone or drop-off address.
     search: Annotated[str, Field(min_length=1, max_length=100)] | None = None
     sort: OrderSort = "-created_at"
+
+
+class BusinessBrief(BaseModel):
+    id: uuid.UUID
+    name: str
+    phone: str
+
+
+class DriverBrief(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    phone: str
+    vehicle_type: VehicleType
+
+
+class OrderDetail(OrderRead):
+    """An order with the people involved, for detail views (not lists)."""
+
+    business: BusinessBrief
+    driver: DriverBrief | None

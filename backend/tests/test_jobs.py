@@ -306,6 +306,7 @@ async def test_jobs_endpoint_requires_correct_token(
     assert wrong.status_code == 401
     assert right.status_code == 200
     assert right.json() == {
+        "simulated_steps": 0,
         "expired_assignments": 0,
         "reassigned": 0,
         "dispatched_pending": 0,

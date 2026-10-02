@@ -5,10 +5,10 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.api.deps import AdminUser, DbSession, DriverUser
-from app.models import Driver, Order
+from app.models import Driver
 from app.models.enums import DriverStatus
 from app.schemas.driver import DriverAdminRead, DriverListParams, DriverStatusUpdate, LocationUpdate
-from app.schemas.order import OrderRead
+from app.schemas.order import OrderDetail
 from app.schemas.pagination import Page
 from app.schemas.user import DriverRead
 from app.services import dispatch
@@ -50,8 +50,9 @@ async def update_my_location(data: LocationUpdate, user: DriverUser, session: Db
     return await driver_service.update_location(session, user, data)
 
 
-@router.get("/me/order", response_model=OrderRead | None)
-async def get_my_current_order(user: DriverUser, session: DbSession) -> Order | None:
-    """The order the driver is currently working on, or null."""
+@router.get("/me/order", response_model=OrderDetail | None)
+async def get_my_current_order(user: DriverUser, session: DbSession) -> OrderDetail | None:
+    """The order the driver is currently working on (with business contact), or null."""
     assert user.driver is not None
-    return await order_service.get_current_order(session, user.driver.id)
+    order = await order_service.get_current_order(session, user.driver.id)
+    return await order_service.order_detail(session, order) if order else None

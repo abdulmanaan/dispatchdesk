@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     dispatch_workload_window_hours: int = 8
     dispatch_workload_penalty_km: float = 1.0
 
+    # --- Demo mode (public portfolio deployment) ---
+    # Enables one-click demo logins and simulated background drivers.
+    demo_mode: bool = False
+
     # --- Background jobs ---
     # An assigned order not accepted within this time is taken back and reassigned.
     acceptance_timeout_seconds: int = 180

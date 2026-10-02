@@ -58,6 +58,7 @@ async def test_order_timeline_through_the_api(
         "order.delivered",
     ]
     assert events[0]["actor_email"] is not None  # the business owner
+    assert events[0]["actor_name"] == "Test User"
     assert events[1]["actor_id"] is None  # automatic dispatch
     assert events[1]["details"]["driver_id"] == str(driver.id)
 

@@ -20,6 +20,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.demo.simulator import advance_simulated_drivers
 from app.models import Order
 from app.models.enums import OPEN_ORDER_STATUSES, AssignmentStatus, DriverStatus, OrderStatus
 from app.services import audit, order_state
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class JobReport:
+    simulated_steps: int = 0  # demo mode only
     expired_assignments: int = 0
     reassigned: int = 0
     dispatched_pending: int = 0
@@ -155,10 +157,19 @@ async def flag_overdue_orders(session: AsyncSession, report: JobReport) -> None:
     report.flagged_overdue += len(flagged)
 
 
+async def simulate_demo_drivers(session: AsyncSession, report: JobReport) -> None:
+    """Demo mode: let seeded background drivers work their orders."""
+    report.simulated_steps += await advance_simulated_drivers(session)
+
+
 async def run_all_jobs(session: AsyncSession) -> JobReport:
     """Run every job once. Each job is isolated: one failing does not stop the rest."""
     report = JobReport()
-    for job in (expire_unaccepted_assignments, dispatch_waiting_orders, flag_overdue_orders):
+    jobs = [expire_unaccepted_assignments, dispatch_waiting_orders, flag_overdue_orders]
+    if get_settings().demo_mode:
+        # Runs first, so simulated drivers accept before the expiry job looks.
+        jobs.insert(0, simulate_demo_drivers)
+    for job in jobs:
         try:
             await job(session, report)
         except Exception:

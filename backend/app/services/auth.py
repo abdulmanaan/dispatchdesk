@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.security import DUMMY_PASSWORD_HASH, hash_password, verify_password
+from app.demo.accounts import DEMO_EMAILS
 from app.models import Business, Driver, User
 from app.models.enums import DriverStatus, UserRole
 from app.schemas.user import BusinessRegister, DriverRegister
@@ -115,3 +116,19 @@ async def authenticate(session: AsyncSession, *, email: str, password: str) -> U
     if not user.is_active:
         raise InactiveUserError
     return user
+
+
+async def demo_user(session: AsyncSession, role: UserRole) -> User | None:
+    """The active demo account for ``role``, with profiles loaded."""
+    result = await session.execute(
+        select(User)
+        .where(User.email == DEMO_EMAILS[role], User.is_active)
+        .options(*_with_profiles())
+    )
+    return result.scalar_one_or_none()
+
+
+async def demo_users(session: AsyncSession) -> list[User]:
+    """All seeded demo accounts, ordered admin, business, driver."""
+    users = [await demo_user(session, role) for role in DEMO_EMAILS]
+    return [u for u in users if u is not None]

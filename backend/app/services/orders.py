@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.errors import ConflictError, NotFoundError
 from app.db.utils import like_pattern
-from app.models import Driver, Order, OrderAssignment, User
+from app.models import Business, Driver, Order, OrderAssignment, User
 from app.models.enums import (
     ACTIVE_ORDER_STATUSES,
     OPEN_ASSIGNMENT_STATUSES,
@@ -23,7 +23,14 @@ from app.models.enums import (
     OrderStatus,
     UserRole,
 )
-from app.schemas.order import OrderCreate, OrderListParams
+from app.schemas.order import (
+    BusinessBrief,
+    DriverBrief,
+    OrderCreate,
+    OrderDetail,
+    OrderListParams,
+    OrderRead,
+)
 from app.services import audit, order_state
 
 _SORT_COLUMNS = {
@@ -110,6 +117,33 @@ async def get_order(
     if order is None:
         raise NotFoundError("Order not found")
     return order
+
+
+async def order_detail(session: AsyncSession, order: Order) -> OrderDetail:
+    """Attach business and driver contact details to an order."""
+    business = (
+        await session.execute(
+            select(Business.id, Business.name, Business.phone).where(
+                Business.id == order.business_id
+            )
+        )
+    ).one()
+    driver = None
+    if order.driver_id is not None:
+        driver = (
+            await session.execute(
+                select(Driver.id, User.full_name, Driver.phone, Driver.vehicle_type)
+                .join(User, User.id == Driver.user_id)
+                .where(Driver.id == order.driver_id)
+            )
+        ).one_or_none()
+    return OrderDetail.model_validate(
+        {
+            **OrderRead.model_validate(order).model_dump(),
+            "business": BusinessBrief(**business._asdict()),
+            "driver": DriverBrief(**driver._asdict()) if driver else None,
+        }
+    )
 
 
 async def create_order(session: AsyncSession, user: User, data: OrderCreate) -> Order:

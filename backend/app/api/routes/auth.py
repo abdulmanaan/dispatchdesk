@@ -9,8 +9,9 @@ from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.core.rate_limit import auth_rate_limit
 from app.core.security import create_access_token
+from app.demo.accounts import DEMO_DESCRIPTIONS
 from app.models import User
-from app.schemas.auth import TokenResponse
+from app.schemas.auth import DemoAccount, DemoInfo, DemoLogin, TokenResponse
 from app.schemas.user import BusinessRegister, DriverRegister, UserRead
 from app.services import auth as auth_service
 
@@ -83,3 +84,34 @@ async def login(
 async def read_me(user: CurrentUser) -> User:
     """Return the signed-in user and their profile."""
     return user
+
+
+# --- Public demo -----------------------------------------------------------------
+
+
+@router.get("/demo", response_model=DemoInfo)
+async def demo_info(session: DbSession) -> DemoInfo:
+    """Lists the one-click demo accounts (empty unless DEMO_MODE is on and data is seeded)."""
+    if not get_settings().demo_mode:
+        return DemoInfo(enabled=False, accounts=[])
+    users = await auth_service.demo_users(session)
+    return DemoInfo(
+        enabled=bool(users),
+        accounts=[
+            DemoAccount(role=u.role, full_name=u.full_name, description=DEMO_DESCRIPTIONS[u.role])
+            for u in users
+        ],
+    )
+
+
+@router.post("/demo-login", response_model=TokenResponse, dependencies=[Depends(auth_rate_limit)])
+async def demo_login(data: DemoLogin, session: DbSession) -> TokenResponse:
+    """Sign in as the demo account for a role, without a password (demo mode only)."""
+    user = await auth_service.demo_user(session, data.role) if get_settings().demo_mode else None
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo is not available")
+    return TokenResponse(
+        access_token=create_access_token(user.id, user.role),
+        expires_in=get_settings().access_token_expire_minutes * 60,
+        user=UserRead.model_validate(user),
+    )

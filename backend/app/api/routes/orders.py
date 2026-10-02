@@ -9,7 +9,14 @@ from app.api.deps import BusinessUser, CurrentUser, DbSession, DriverUser, requi
 from app.models import Order, User
 from app.models.enums import UserRole
 from app.schemas.audit import AuditLogRead
-from app.schemas.order import OrderCancel, OrderCreate, OrderFail, OrderListParams, OrderRead
+from app.schemas.order import (
+    OrderCancel,
+    OrderCreate,
+    OrderDetail,
+    OrderFail,
+    OrderListParams,
+    OrderRead,
+)
 from app.schemas.pagination import Page
 from app.services import audit, dispatch
 from app.services import orders as order_service
@@ -49,9 +56,11 @@ async def list_orders(
     )
 
 
-@router.get("/{order_id}", response_model=OrderRead)
-async def get_order(order_id: uuid.UUID, user: CurrentUser, session: DbSession) -> Order:
-    return await order_service.get_order(session, user, order_id)
+@router.get("/{order_id}", response_model=OrderDetail)
+async def get_order(order_id: uuid.UUID, user: CurrentUser, session: DbSession) -> OrderDetail:
+    """One order with its business and driver contact details."""
+    order = await order_service.get_order(session, user, order_id)
+    return await order_service.order_detail(session, order)
 
 
 @router.get("/{order_id}/events", response_model=list[AuditLogRead])

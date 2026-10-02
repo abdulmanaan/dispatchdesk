@@ -394,3 +394,35 @@ async def test_cancel_permissions(client: AsyncClient, db_session: AsyncSession)
 
     as_driver = await client.post(f"/orders/{order.id}/cancel", headers=driver_headers(driver))
     assert as_driver.status_code == 403
+
+
+# --- Detail ----------------------------------------------------------------------
+
+
+async def test_order_detail_includes_business_and_driver(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    business = await create_business(db_session)
+    driver = await create_driver(db_session)
+    order = await create_order(db_session, business)
+    pending = await create_order(db_session, business)
+    await assign_order(db_session, order, driver)
+    await db_session.commit()
+
+    detail = (await client.get(f"/orders/{order.id}", headers=business_headers(business))).json()
+    unassigned = (
+        await client.get(f"/orders/{pending.id}", headers=business_headers(business))
+    ).json()
+    as_driver = (await client.get("/drivers/me/order", headers=driver_headers(driver))).json()
+
+    assert detail["business"] == {
+        "id": str(business.id),
+        "name": business.name,
+        "phone": business.phone,
+    }
+    assert detail["driver"]["id"] == str(driver.id)
+    assert detail["driver"]["full_name"] == "Test User"
+    assert detail["driver"]["vehicle_type"] == "motorbike"
+    assert unassigned["driver"] is None
+    # The driver's current order carries the business contact for the pickup.
+    assert as_driver["business"]["phone"] == business.phone
