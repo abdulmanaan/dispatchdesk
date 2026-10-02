@@ -8,7 +8,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 from app.models.enums import OrderStatus
 from app.schemas.common import Latitude, Longitude, NonEmptyStr, Phone
-from app.schemas.pagination import MAX_PAGE_SIZE
+from app.schemas.pagination import PageParams
 
 # How far ahead a delivery deadline may be set.
 MAX_DELIVERY_WINDOW = timedelta(hours=24)
@@ -49,6 +49,12 @@ class OrderCancel(BaseModel):
     reason: Annotated[str, Field(max_length=200)] | None = None
 
 
+class OrderFail(BaseModel):
+    """A driver reporting that a delivery could not be completed."""
+
+    reason: Annotated[NonEmptyStr, Field(min_length=3, max_length=200)]
+
+
 class OrderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -81,10 +87,8 @@ class OrderRead(BaseModel):
 OrderSort = Literal["created_at", "-created_at", "deliver_by", "-deliver_by"]
 
 
-class OrderListParams(BaseModel):
-    """Query parameters for listing orders. Unknown parameters are rejected."""
-
-    model_config = ConfigDict(extra="forbid")
+class OrderListParams(PageParams):
+    """Query parameters for listing orders."""
 
     status: list[OrderStatus] = []
     business_id: uuid.UUID | None = None
@@ -95,5 +99,3 @@ class OrderListParams(BaseModel):
     # Case-insensitive match on customer name, customer phone or drop-off address.
     search: Annotated[str, Field(min_length=1, max_length=100)] | None = None
     sort: OrderSort = "-created_at"
-    page: Annotated[int, Field(ge=1)] = 1
-    page_size: Annotated[int, Field(ge=1, le=MAX_PAGE_SIZE)] = 20

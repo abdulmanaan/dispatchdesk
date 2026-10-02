@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import ConflictError, NotFoundError
+from app.db.utils import like_pattern
 from app.models import Driver, Order, OrderAssignment, User
 from app.models.enums import (
     ACTIVE_ORDER_STATUSES,
@@ -44,10 +45,6 @@ def _visibility_filter(user: User) -> ColumnElement[bool] | None:
     return Order.driver_id == user.driver.id
 
 
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
 def _list_conditions(user: User, params: OrderListParams) -> list[ColumnElement[bool]]:
     conditions: list[ColumnElement[bool]] = []
     if (visible := _visibility_filter(user)) is not None:
@@ -65,7 +62,7 @@ def _list_conditions(user: User, params: OrderListParams) -> list[ColumnElement[
     if params.created_to:
         conditions.append(Order.created_at < params.created_to)
     if params.search:
-        pattern = f"%{_escape_like(params.search)}%"
+        pattern = like_pattern(params.search)
         conditions.append(
             or_(
                 Order.customer_name.ilike(pattern, escape="\\"),
@@ -88,7 +85,7 @@ async def list_orders(
         .where(*conditions)
         # id as a tie-breaker keeps pagination stable when timestamps are equal.
         .order_by(_SORT_COLUMNS[params.sort], Order.id)
-        .offset((params.page - 1) * params.page_size)
+        .offset(params.offset)
         .limit(params.page_size)
     )
     items = (await session.scalars(stmt)).all()
@@ -151,6 +148,19 @@ async def create_order(session: AsyncSession, user: User, data: OrderCreate) -> 
     return order
 
 
+async def _set_assignment_status(
+    session: AsyncSession, order_id: uuid.UUID, status: AssignmentStatus, **values: object
+) -> None:
+    await session.execute(
+        update(OrderAssignment)
+        .where(
+            OrderAssignment.order_id == order_id,
+            OrderAssignment.status.in_(OPEN_ASSIGNMENT_STATUSES),
+        )
+        .values(status=status, **values)
+    )
+
+
 async def release_driver(
     session: AsyncSession,
     *,
@@ -159,18 +169,11 @@ async def release_driver(
     outcome: AssignmentStatus,
     now: datetime,
 ) -> None:
-    """Close the order's open assignment and make a busy driver available again.
+    """Close the order's open assignment (with ``outcome``) and free a busy driver.
 
     Call only while holding the order's row lock (see the locking rule above).
     """
-    await session.execute(
-        update(OrderAssignment)
-        .where(
-            OrderAssignment.order_id == order_id,
-            OrderAssignment.status.in_(OPEN_ASSIGNMENT_STATUSES),
-        )
-        .values(status=outcome, ended_at=now)
-    )
+    await _set_assignment_status(session, order_id, outcome, ended_at=now)
     driver = await session.get(Driver, driver_id, with_for_update=True, populate_existing=True)
     if driver is not None and driver.status == DriverStatus.BUSY:
         driver.status = DriverStatus.AVAILABLE
@@ -213,3 +216,95 @@ async def cancel_order(
     )
     await session.commit()
     return order
+
+
+# --- Driver actions --------------------------------------------------------------
+# A driver only sees orders currently assigned to them, so ``get_order`` with the
+# driver's visibility filter also enforces ownership (anything else is a 404).
+
+
+async def accept_order(session: AsyncSession, user: User, order_id: uuid.UUID) -> Order:
+    order = await get_order(session, user, order_id, for_update=True)
+    now = datetime.now(UTC)
+
+    order_state.accept(order, now=now)
+    await _set_assignment_status(session, order.id, AssignmentStatus.ACCEPTED, accepted_at=now)
+
+    audit.record(
+        session, actor=user, action="order.accepted", entity_type="order", entity_id=order.id
+    )
+    await session.commit()
+    return order
+
+
+async def pick_up_order(session: AsyncSession, user: User, order_id: uuid.UUID) -> Order:
+    order = await get_order(session, user, order_id, for_update=True)
+
+    order_state.pick_up(order, now=datetime.now(UTC))
+
+    audit.record(
+        session, actor=user, action="order.picked_up", entity_type="order", entity_id=order.id
+    )
+    await session.commit()
+    return order
+
+
+async def deliver_order(session: AsyncSession, user: User, order_id: uuid.UUID) -> Order:
+    order = await get_order(session, user, order_id, for_update=True)
+    now = datetime.now(UTC)
+
+    order_state.deliver(order, now=now)
+    assert order.driver_id is not None
+    await release_driver(
+        session,
+        order_id=order.id,
+        driver_id=order.driver_id,
+        outcome=AssignmentStatus.COMPLETED,
+        now=now,
+    )
+
+    audit.record(
+        session,
+        actor=user,
+        action="order.delivered",
+        entity_type="order",
+        entity_id=order.id,
+        details={"late": now > order.deliver_by},
+    )
+    await session.commit()
+    return order
+
+
+async def fail_order(session: AsyncSession, user: User, order_id: uuid.UUID, reason: str) -> Order:
+    """Driver reports the delivery cannot be completed (e.g. customer unreachable)."""
+    order = await get_order(session, user, order_id, for_update=True)
+    now = datetime.now(UTC)
+    previous_status = order.status
+
+    order_state.fail(order, reason=f"Failed by driver: {reason}", now=now)
+    assert order.driver_id is not None
+    await release_driver(
+        session,
+        order_id=order.id,
+        driver_id=order.driver_id,
+        outcome=AssignmentStatus.FAILED,
+        now=now,
+    )
+
+    audit.record(
+        session,
+        actor=user,
+        action="order.failed",
+        entity_type="order",
+        entity_id=order.id,
+        details={"from_status": previous_status.value, "reason": reason},
+    )
+    await session.commit()
+    return order
+
+
+async def get_current_order(session: AsyncSession, driver_id: uuid.UUID) -> Order | None:
+    """The driver's active order, if any (at most one, enforced by a unique index)."""
+    return await session.scalar(
+        select(Order).where(Order.driver_id == driver_id, Order.status.in_(ACTIVE_ORDER_STATUSES))
+    )

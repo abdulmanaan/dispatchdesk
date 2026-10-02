@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import auth, health, orders
+from app.api.routes import auth, drivers, health, orders
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.db.session import engine
@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(orders.router)
+    app.include_router(drivers.router)
     register_error_handlers(app)
     return app
 

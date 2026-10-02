@@ -5,10 +5,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import BusinessUser, CurrentUser, DbSession, require_roles
+from app.api.deps import BusinessUser, CurrentUser, DbSession, DriverUser, require_roles
 from app.models import Order, User
 from app.models.enums import UserRole
-from app.schemas.order import OrderCancel, OrderCreate, OrderListParams, OrderRead
+from app.schemas.order import OrderCancel, OrderCreate, OrderFail, OrderListParams, OrderRead
 from app.schemas.pagination import Page
 from app.services import orders as order_service
 
@@ -54,3 +54,32 @@ async def cancel_order(
 ) -> Order:
     """Cancel an open order. Businesses can cancel only before pickup."""
     return await order_service.cancel_order(session, user, order_id, data.reason if data else None)
+
+
+# --- Driver actions --------------------------------------------------------------
+
+
+@router.post("/{order_id}/accept", response_model=OrderRead)
+async def accept_order(order_id: uuid.UUID, user: DriverUser, session: DbSession) -> Order:
+    """Accept an order assigned to you. Unaccepted orders are reassigned after a timeout."""
+    return await order_service.accept_order(session, user, order_id)
+
+
+@router.post("/{order_id}/pickup", response_model=OrderRead)
+async def pick_up_order(order_id: uuid.UUID, user: DriverUser, session: DbSession) -> Order:
+    """Confirm you collected the order from the pickup location."""
+    return await order_service.pick_up_order(session, user, order_id)
+
+
+@router.post("/{order_id}/deliver", response_model=OrderRead)
+async def deliver_order(order_id: uuid.UUID, user: DriverUser, session: DbSession) -> Order:
+    """Confirm delivery. You become available for new orders."""
+    return await order_service.deliver_order(session, user, order_id)
+
+
+@router.post("/{order_id}/fail", response_model=OrderRead)
+async def fail_order(
+    order_id: uuid.UUID, data: OrderFail, user: DriverUser, session: DbSession
+) -> Order:
+    """Report that the delivery cannot be completed. You become available again."""
+    return await order_service.fail_order(session, user, order_id, data.reason)
