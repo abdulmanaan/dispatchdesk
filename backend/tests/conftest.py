@@ -12,6 +12,8 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL",
     "postgresql+asyncpg://dispatchdesk:dispatchdesk@localhost:5433/dispatchdesk_test",
 )
+# A dedicated Redis database for tests; it is flushed before every test.
+os.environ["REDIS_URL"] = os.environ.get("TEST_REDIS_URL", "redis://localhost:6379/15")
 
 import asyncio  # noqa: E402
 from collections.abc import AsyncIterator  # noqa: E402
@@ -24,6 +26,7 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from alembic import command  # noqa: E402
+from app.core.redis import close_redis, get_redis  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
@@ -48,6 +51,16 @@ async def database_schema() -> AsyncIterator[None]:
     await asyncio.to_thread(command.upgrade, alembic_config(), "head")
     yield
     await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+async def clean_redis() -> AsyncIterator[None]:
+    """Start every test with an empty cache and fresh rate-limit counters."""
+    redis = get_redis()
+    assert redis is not None
+    await redis.flushdb()
+    yield
+    await close_redis()  # some tests swap the Redis URL; never leak a client
 
 
 @pytest.fixture(autouse=True)

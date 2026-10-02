@@ -38,6 +38,7 @@ services:
       ENVIRONMENT: development
       DEBUG: "true"
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dispatchdesk}:${POSTGRES_PASSWORD:-dispatchdesk}@postgres:5432/${POSTGRES_DB:-dispatchdesk}
+      REDIS_URL: redis://redis:6379/0
     # Apply migrations, then start the API with auto-reload on code changes.
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
@@ -46,6 +47,8 @@ services:
       - ./backend:/app
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # Runs the background jobs (reassign unaccepted orders, retry pending dispatch,
@@ -56,6 +59,7 @@ services:
     environment:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dispatchdesk}:${POSTGRES_PASSWORD:-dispatchdesk}@postgres:5432/${POSTGRES_DB:-dispatchdesk}
+      REDIS_URL: redis://redis:6379/0
       JOBS_INTERVAL_SECONDS: ${JOBS_INTERVAL_SECONDS:-30}
       ACCEPTANCE_TIMEOUT_SECONDS: ${ACCEPTANCE_TIMEOUT_SECONDS:-180}
     command: python -m app.jobs.worker

@@ -3,31 +3,35 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
-from app.api.routes import auth, dispatch, drivers, health, internal, orders
+from app.api.routes import audit_logs, auth, dispatch, drivers, health, internal, orders, stats
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
+from app.core.rate_limit import default_rate_limit
+from app.core.redis import close_redis
 from app.db.session import engine
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Release pooled database connections on shutdown."""
+    """Release pooled database and Redis connections on shutdown."""
     yield
     await engine.dispose()
+    await close_redis()
 
 
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application."""
     settings = get_settings()
     app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
+    # Health checks and the token-protected jobs endpoint are not rate limited.
     app.include_router(health.router)
-    app.include_router(auth.router)
-    app.include_router(orders.router)
-    app.include_router(drivers.router)
-    app.include_router(dispatch.router)
     app.include_router(internal.router)
+
+    rate_limited = [Depends(default_rate_limit)]
+    for module in (auth, orders, drivers, dispatch, stats, audit_logs):
+        app.include_router(module.router, dependencies=rate_limited)
     register_error_handlers(app)
     return app
 

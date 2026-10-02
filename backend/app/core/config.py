@@ -50,6 +50,19 @@ class Settings(BaseSettings):
     # Echo SQL statements to the log (noisy, useful for debugging).
     database_echo: bool = False
 
+    # Redis for caching and rate limiting. Unset (or unreachable) means both features
+    # are skipped and requests still succeed. Upstash "rediss://" URLs work too.
+    redis_url: str | None = "redis://localhost:6379/0"
+    cache_stats_ttl_seconds: int = 10
+
+    rate_limit_enabled: bool = True
+    rate_limit_default_per_minute: int = 120
+    # Login and registration, per client IP.
+    rate_limit_auth_per_minute: int = 10
+    # Use the first X-Forwarded-For address as the client IP. Enable only behind a
+    # trusted reverse proxy, otherwise clients can spoof their IP.
+    trust_forwarded_for: bool = False
+
     jwt_secret_key: SecretStr = SecretStr(_DEV_JWT_SECRET)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60

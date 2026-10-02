@@ -45,9 +45,30 @@ All jobs are safe to run concurrently (row locks with `SKIP LOCKED`, atomic upda
   `POST /internal/jobs/run` with header `X-Jobs-Token: <token>`. The endpoint returns 404
   while `JOBS_TOKEN` is unset.
 
+## Redis: rate limiting and caching
+
+Redis is optional. If `REDIS_URL` is empty or Redis is down, both features switch off
+(with a logged warning) and the API keeps working.
+
+- **Rate limiting** (fixed one-minute windows): login and registration are limited to
+  `RATE_LIMIT_AUTH_PER_MINUTE` per IP, and every other endpoint to
+  `RATE_LIMIT_DEFAULT_PER_MINUTE` per user (or per IP when anonymous). Responses carry
+  `X-RateLimit-*` headers; a 429 also includes `Retry-After`. Set `TRUST_FORWARDED_FOR=true`
+  only behind a trusted reverse proxy.
+- **Caching**: `GET /stats/overview` is cached for `CACHE_STATS_TTL_SECONDS` (`X-Cache: HIT/MISS`).
+  A short TTL is used instead of invalidation because the underlying data changes on almost
+  every request. Operational lists (orders, drivers) are always live.
+
+## Audit trail
+
+Every state change is written to `audit_logs` in the same transaction as the change.
+Admins browse it at `GET /audit-logs`; anyone who can see an order can read its timeline
+at `GET /orders/{id}/events`.
+
 ## Tests and linting
 
-Requires the Postgres container from the root `docker-compose.yml` (it creates the `dispatchdesk_test` database).
+Requires the Postgres and Redis containers from the root `docker-compose.yml` (tests use the
+`dispatchdesk_test` database and Redis database 15).
 
 ```bash
 uv run pytest

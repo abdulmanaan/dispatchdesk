@@ -23,13 +23,12 @@ LAHORE_LAT, LAHORE_LNG = 31.5104, 74.3416
 
 
 async def create_user(session: AsyncSession, role: UserRole, **overrides: Any) -> User:
-    user = User(
-        email=f"{role.value}-{uuid4().hex[:8]}@example.com",
-        hashed_password="not-a-real-hash",
-        full_name="Test User",
-        role=role,
-        **overrides,
-    )
+    values: dict[str, Any] = {
+        "email": f"{role.value}-{uuid4().hex[:8]}@example.com",
+        "hashed_password": "not-a-real-hash",
+        "full_name": "Test User",
+    } | overrides
+    user = User(role=role, **values)
     session.add(user)
     await session.flush()
     return user

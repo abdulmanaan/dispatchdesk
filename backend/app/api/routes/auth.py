@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
+from app.core.rate_limit import auth_rate_limit
 from app.core.security import create_access_token
 from app.models import User
 from app.schemas.auth import TokenResponse
@@ -20,7 +21,12 @@ _email_taken = HTTPException(
 )
 
 
-@router.post("/register/business", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register/business",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(auth_rate_limit)],
+)
 async def register_business(data: BusinessRegister, session: DbSession) -> User:
     """Create a business account together with its business profile."""
     try:
@@ -29,7 +35,12 @@ async def register_business(data: BusinessRegister, session: DbSession) -> User:
         raise _email_taken from None
 
 
-@router.post("/register/driver", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register/driver",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(auth_rate_limit)],
+)
 async def register_driver(data: DriverRegister, session: DbSession) -> User:
     """Create a driver account. Drivers start offline."""
     try:
@@ -38,7 +49,7 @@ async def register_driver(data: DriverRegister, session: DbSession) -> User:
         raise _email_taken from None
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(auth_rate_limit)])
 async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()], session: DbSession
 ) -> TokenResponse:
