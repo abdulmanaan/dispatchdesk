@@ -10,6 +10,7 @@ from app.models import Order, User
 from app.models.enums import UserRole
 from app.schemas.order import OrderCancel, OrderCreate, OrderFail, OrderListParams, OrderRead
 from app.schemas.pagination import Page
+from app.services import dispatch
 from app.services import orders as order_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -19,8 +20,15 @@ AdminOrBusiness = Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
 async def create_order(data: OrderCreate, user: BusinessUser, session: DbSession) -> Order:
-    """Create a delivery order for the signed-in business."""
-    return await order_service.create_order(session, user, data)
+    """Create a delivery order for the signed-in business.
+
+    The order is dispatched immediately if a suitable driver is available, so the
+    response may already show it as ``assigned``. Otherwise it stays ``pending``.
+    """
+    order = await order_service.create_order(session, user, data)
+    await dispatch.dispatch_quietly(session, order.id)
+    await session.refresh(order)
+    return order
 
 
 @router.get("", response_model=Page[OrderRead])
@@ -73,8 +81,11 @@ async def pick_up_order(order_id: uuid.UUID, user: DriverUser, session: DbSessio
 
 @router.post("/{order_id}/deliver", response_model=OrderRead)
 async def deliver_order(order_id: uuid.UUID, user: DriverUser, session: DbSession) -> Order:
-    """Confirm delivery. You become available for new orders."""
-    return await order_service.deliver_order(session, user, order_id)
+    """Confirm delivery. You become available and may be assigned the next order."""
+    order = await order_service.deliver_order(session, user, order_id)
+    await dispatch.dispatch_quietly(session)
+    await session.refresh(order)
+    return order
 
 
 @router.post("/{order_id}/fail", response_model=OrderRead)
@@ -82,4 +93,7 @@ async def fail_order(
     order_id: uuid.UUID, data: OrderFail, user: DriverUser, session: DbSession
 ) -> Order:
     """Report that the delivery cannot be completed. You become available again."""
-    return await order_service.fail_order(session, user, order_id, data.reason)
+    order = await order_service.fail_order(session, user, order_id, data.reason)
+    await dispatch.dispatch_quietly(session)
+    await session.refresh(order)
+    return order

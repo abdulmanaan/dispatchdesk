@@ -57,6 +57,17 @@ class Settings(BaseSettings):
     # Default delivery deadline (minutes after creation) when a business omits one.
     default_delivery_window_minutes: int = 60
 
+    # --- Auto-dispatch tuning ---
+    # Only drivers within this distance of the pickup are considered.
+    dispatch_max_radius_km: float = 15.0
+    # Ignore drivers whose last location is older than this. 0 disables the check
+    # (useful for a demo deployment where seeded locations never move).
+    dispatch_location_max_age_minutes: int = 60
+    # Fairness: each delivery completed within this window adds a penalty, expressed
+    # as extra kilometres, so a slightly farther but less busy driver can win.
+    dispatch_workload_window_hours: int = 8
+    dispatch_workload_penalty_km: float = 1.0
+
     @field_validator("database_url")
     @classmethod
     def _normalize_database_url(cls, value: str) -> str:
