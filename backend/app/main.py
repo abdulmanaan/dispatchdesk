@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import audit_logs, auth, dispatch, drivers, health, internal, orders, stats
 from app.core.config import get_settings
@@ -25,6 +26,14 @@ def create_app() -> FastAPI:
     """Build and configure the FastAPI application."""
     settings = get_settings()
     app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["*"],
+        allow_headers=["Authorization", "Content-Type"],
+        # Let the browser read rate-limit and cache headers.
+        expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After", "X-Cache"],
+    )
     # Health checks and the token-protected jobs endpoint are not rate limited.
     app.include_router(health.router)
     app.include_router(internal.router)

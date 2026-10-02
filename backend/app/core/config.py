@@ -1,11 +1,11 @@
 """Application settings loaded from environment variables and the .env file."""
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Development-only fallback. Production must set JWT_SECRET_KEY explicitly.
 _DEV_JWT_SECRET = "dev-insecure-secret-change-me-in-production"
@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "DispatchDesk API"
+    # Browser origins allowed to call the API (the frontend). Comma-separated in env.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
 
@@ -91,6 +93,13 @@ class Settings(BaseSettings):
     # Shared secret for POST /internal/jobs/run (used by an external scheduler in
     # production). The endpoint is disabled while this is unset.
     jobs_token: SecretStr | None = None
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [origin.strip().rstrip("/") for origin in value.split(",") if origin.strip()]
+        return value
 
     @field_validator("database_url")
     @classmethod
