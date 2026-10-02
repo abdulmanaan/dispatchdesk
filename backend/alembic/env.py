@@ -11,11 +11,13 @@ from alembic import context
 from app.core.config import get_settings
 from app.db.base import Base
 
-# ORM models are imported here (once they exist) so autogenerate can see them.
+# Register every ORM model on Base.metadata so autogenerate can see them.
+import app.models  # noqa: E402, F401  isort: skip
 
 config = context.config
 
-if config.config_file_name is not None:
+# Callers that manage logging themselves (e.g. the test suite) can opt out.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata

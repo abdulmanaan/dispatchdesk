@@ -1,6 +1,8 @@
 """Declarative base class shared by all ORM models."""
 
-from sqlalchemy import MetaData
+from datetime import datetime
+
+from sqlalchemy import DateTime, MetaData
 from sqlalchemy.orm import DeclarativeBase
 
 # Deterministic constraint names so Alembic migrations stay stable and readable.
@@ -17,3 +19,5 @@ class Base(DeclarativeBase):
     """Base class for all ORM models."""
 
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+    # All datetimes are stored as TIMESTAMPTZ (timezone-aware, UTC on the wire).
+    type_annotation_map = {datetime: DateTime(timezone=True)}
