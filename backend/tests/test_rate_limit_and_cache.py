@@ -86,31 +86,44 @@ async def test_health_is_not_rate_limited() -> None:
     assert codes == {200}
 
 
+async def burst(client: AsyncClient, forwarded_for: list[str]) -> list[int]:
+    """One login attempt per X-Forwarded-For value."""
+    return [
+        (
+            await client.post(
+                "/auth/login",
+                data={"username": "x@example.com", "password": "x"},
+                headers={"X-Forwarded-For": value},
+            )
+        ).status_code
+        for value in forwarded_for
+    ]
+
+
 @pytest.mark.usefixtures("low_limits")
-async def test_forwarded_for_is_ignored_unless_trusted(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def burst(client: AsyncClient, spoofed_ips: list[str]) -> list[int]:
-        return [
-            (
-                await client.post(
-                    "/auth/login",
-                    data={"username": "x@example.com", "password": "x"},
-                    headers={"X-Forwarded-For": ip},
-                )
-            ).status_code
-            for ip in spoofed_ips
-        ]
-
+async def test_forwarded_for_is_ignored_without_trusted_proxies() -> None:
     async with client_from("10.0.0.4") as client:
-        # Untrusted: rotating the header does not bypass the limit.
-        untrusted = await burst(client, ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4"])
+        # Rotating the header does not bypass the limit.
+        codes = await burst(client, ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4"])
 
-    monkeypatch.setattr(get_settings(), "trust_forwarded_for", True)
+    assert codes[-1] == 429
+
+
+@pytest.mark.usefixtures("low_limits")
+async def test_behind_one_proxy_each_client_has_its_own_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "trusted_proxy_hops", 1)
+
     async with client_from("10.0.0.5") as proxy:
-        # Behind a trusted proxy, each real client (first header entry) is counted alone.
-        trusted = await burst(proxy, ["5.5.5.5, 10.0.0.5", "6.6.6.6", "7.7.7.7", "8.8.8.8"])
+        # Four different visitors behind the same proxy: none is limited.
+        visitors = await burst(proxy, ["203.0.113.1", "203.0.113.2", "203.0.113.3", "203.0.113.4"])
+        # One visitor faking a new IP each time: the proxy appends the real one last,
+        # so the fake left-hand values are ignored and the limit still applies.
+        spoofer = await burst(proxy, [f"6.6.6.{n}, 198.51.100.9" for n in range(4)])
 
-    assert untrusted[-1] == 429
-    assert 429 not in trusted
+    assert 429 not in visitors
+    assert spoofer[-1] == 429
 
 
 @pytest.mark.usefixtures("low_limits", "redis_down")

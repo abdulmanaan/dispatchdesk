@@ -12,6 +12,7 @@ from app.core.errors import register_error_handlers
 from app.core.rate_limit import default_rate_limit
 from app.core.redis import close_redis
 from app.db.session import engine
+from app.demo.heartbeat import demo_heartbeat
 
 
 @asynccontextmanager
@@ -38,9 +39,10 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(internal.router)
 
-    rate_limited = [Depends(default_rate_limit)]
+    # The demo heartbeat is a no-op unless DEMO_MODE is on.
+    public = [Depends(default_rate_limit), Depends(demo_heartbeat)]
     for module in (auth, orders, drivers, dispatch, stats, audit_logs):
-        app.include_router(module.router, dependencies=rate_limited)
+        app.include_router(module.router, dependencies=public)
     register_error_handlers(app)
     return app
 

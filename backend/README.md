@@ -53,8 +53,9 @@ Redis is optional. If `REDIS_URL` is empty or Redis is down, both features switc
 - **Rate limiting** (fixed one-minute windows): login and registration are limited to
   `RATE_LIMIT_AUTH_PER_MINUTE` per IP, and every other endpoint to
   `RATE_LIMIT_DEFAULT_PER_MINUTE` per user (or per IP when anonymous). Responses carry
-  `X-RateLimit-*` headers; a 429 also includes `Retry-After`. Set `TRUST_FORWARDED_FOR=true`
-  only behind a trusted reverse proxy.
+  `X-RateLimit-*` headers; a 429 also includes `Retry-After`. Behind a reverse proxy, set
+  `TRUSTED_PROXY_HOPS` to the number of proxies (1 on most hosts) so each visitor is counted
+  by their own IP; spoofed `X-Forwarded-For` entries are ignored.
 - **Caching**: `GET /stats/overview` is cached for `CACHE_STATS_TTL_SECONDS` (`X-Cache: HIT/MISS`).
   A short TTL is used instead of invalidation because the underlying data changes on almost
   every request. Operational lists (orders, drivers) are always live.

@@ -20,10 +20,18 @@ WINDOW_SECONDS = 60
 
 
 def client_ip(request: Request) -> str:
-    if get_settings().trust_forwarded_for:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+    """The caller's IP, taking ``trusted_proxy_hops`` reverse proxies into account.
+
+    With proxies in front, the rightmost ``hops`` entries of X-Forwarded-For were
+    written by them; the entry they recorded for the client is the last trusted one.
+    Entries further left come from the client itself and are ignored.
+    """
+    hops = get_settings().trusted_proxy_hops
+    if hops > 0:
+        chain = [ip.strip() for ip in request.headers.get("x-forwarded-for", "").split(",")]
+        chain = [ip for ip in chain if ip]
+        if len(chain) >= hops:
+            return chain[-hops]
     return request.client.host if request.client else "unknown"
 
 

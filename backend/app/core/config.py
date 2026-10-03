@@ -61,9 +61,11 @@ class Settings(BaseSettings):
     rate_limit_default_per_minute: int = 120
     # Login and registration, per client IP.
     rate_limit_auth_per_minute: int = 10
-    # Use the first X-Forwarded-For address as the client IP. Enable only behind a
-    # trusted reverse proxy, otherwise clients can spoof their IP.
-    trust_forwarded_for: bool = False
+    # Number of trusted reverse proxies in front of the app (e.g. 1 on a PaaS).
+    # Each proxy appends the address it saw to X-Forwarded-For, so the real client
+    # is the Nth entry from the right; anything further left can be spoofed.
+    # 0 ignores the header and uses the socket address.
+    trusted_proxy_hops: int = 0
 
     jwt_secret_key: SecretStr = SecretStr(_DEV_JWT_SECRET)
     jwt_algorithm: str = "HS256"
