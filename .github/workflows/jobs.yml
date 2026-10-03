@@ -1,0 +1,42 @@
+name: Scheduled jobs
+
+# Free hosting tiers don't run worker processes, so GitHub calls the backend's
+# token-protected job endpoints on a schedule instead.
+#
+# Every 15 minutes (not 5) on purpose: each call wakes the Neon database, and
+# Neon's free plan has 100 compute-hours a month. While people are using the demo,
+# the backend also runs the jobs itself (the demo heartbeat), so it stays lively.
+on:
+  schedule:
+    - cron: "*/15 * * * *" # background jobs
+    - cron: "0 22 * * *" # demo reset, 03:00 in Lahore (UTC+5)
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to run
+        type: choice
+        options: [jobs, reset-demo]
+        default: jobs
+
+permissions: {}
+
+jobs:
+  call-backend:
+    name: Call backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API_URL: ${{ vars.API_URL }}
+      JOBS_TOKEN: ${{ secrets.JOBS_TOKEN }}
+      TASK: ${{ github.event.schedule == '0 22 * * *' && 'reset-demo' || inputs.task || 'jobs' }}
+    steps:
+      - name: Call the endpoint
+        run: |
+          if [ -z "$API_URL" ] || [ -z "$JOBS_TOKEN" ]; then
+            echo "::notice::Skipping: set the API_URL variable and JOBS_TOKEN secret (see docs/DEPLOYMENT.md)."
+            exit 0
+          fi
+          if [ "$TASK" = "reset-demo" ]; then path=/internal/demo/reset; else path=/internal/jobs/run; fi
+          # Retries cover the backend and database waking up from scale-to-zero.
+          curl --fail-with-body --silent --show-error --retry 3 --retry-delay 10 --retry-all-errors \
+            --max-time 60 -X POST -H "X-Jobs-Token: $JOBS_TOKEN" "${API_URL%/}$path"

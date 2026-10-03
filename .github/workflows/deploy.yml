@@ -1,0 +1,67 @@
+name: Deploy backend
+
+# After CI passes on main: apply database migrations, then deploy to FastAPI Cloud.
+# Migrations run first because they only ever add to the schema; the old code
+# keeps working against the new schema during the rollout.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false # never interrupt a migration or a deploy halfway
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Migrate and deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      FASTAPI_CLOUD_TOKEN: ${{ secrets.FASTAPI_CLOUD_TOKEN }}
+      FASTAPI_CLOUD_APP_ID: ${{ secrets.FASTAPI_CLOUD_APP_ID }}
+
+    steps:
+      - name: Check that deployment is configured
+        id: config
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$FASTAPI_CLOUD_TOKEN" ] || [ -z "$FASTAPI_CLOUD_APP_ID" ]; then
+            echo "::notice::Skipping deploy: set DATABASE_URL, FASTAPI_CLOUD_TOKEN and FASTAPI_CLOUD_APP_ID secrets (see docs/DEPLOYMENT.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: .
+
+      - uses: actions/checkout@v5
+        if: steps.config.outputs.ready == 'true'
+        with:
+          # Deploy exactly the commit that passed CI.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: astral-sh/setup-uv@v6
+        if: steps.config.outputs.ready == 'true'
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        if: steps.config.outputs.ready == 'true'
+        run: uv sync --frozen
+
+      - name: Apply database migrations
+        if: steps.config.outputs.ready == 'true'
+        run: uv run alembic upgrade head
+
+      - name: Deploy to FastAPI Cloud
+        if: steps.config.outputs.ready == 'true'
+        run: uv run fastapi deploy
