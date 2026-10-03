@@ -5,6 +5,9 @@ CLAUDE.md
 .idea/
 .DS_Store
 
+# --- Deploy tooling (local CLI state) ---
+.fastapicloud/
+
 # --- Environment / secrets ---
 .env
 .env.*

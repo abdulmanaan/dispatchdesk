@@ -137,7 +137,9 @@ break behind a transaction-mode connection pooler such as Neon's.
 
 Locally a worker container runs the jobs every 30 seconds. Free hosting tiers don't run
 long-lived workers, so production triggers the same code through a token-protected
-`POST /internal/jobs/run` called on a schedule.
+`POST /internal/jobs/run`, called every 15 minutes by a scheduled GitHub Actions workflow. In
+demo mode, normal API traffic also runs the jobs in the background (at most every 20 seconds,
+coordinated through Redis), so the demo stays lively while someone is using it.
 
 ## More design decisions
 
@@ -147,8 +149,9 @@ long-lived workers, so production triggers the same code through a token-protect
 - **Roles are read from the database on every request,** not trusted from the JWT, so disabling
   a user or changing a role takes effect immediately.
 - **Rate limiting** with fixed one-minute windows in Redis: 10 login or registration attempts per
-  IP, 120 requests per user otherwise. `X-Forwarded-For` is ignored unless explicitly trusted, so
-  clients can't dodge limits by faking IPs.
+  IP, 120 requests per user otherwise. Behind a proxy, the client IP is read from the
+  `X-Forwarded-For` entry the proxy itself added (a configured number of hops from the right),
+  so clients can't dodge limits by sending fake addresses.
 - **Caching only where it pays off.** The dashboard stats are cached for 10 seconds. Order and
   driver lists stay live: their data changes every few seconds, so invalidating on every write
   would make the cache almost always empty.
@@ -239,12 +242,20 @@ reseeds. To create a real admin: `docker compose exec backend python -m app.scri
 ## Tests
 
 ```bash
-cd backend && uv run pytest        # 217 tests, needs the Postgres and Redis containers
+cd backend && uv run pytest        # 224 tests, needs the Postgres and Redis containers
 cd frontend && npm test            # 47 tests
 ```
 
 CI runs both suites on every push and pull request, with lint, formatting and type checks, against
 real Postgres and Redis service containers. The backend tests rebuild the schema from the Alembic
 migrations on every run and fail if a model changes without a migration.
+
+## Deployment
+
+Runs entirely on free tiers, no credit card: FastAPI Cloud (API), Neon (Postgres), Upstash
+(Redis), Vercel (frontend) and GitHub Actions. After CI passes on `main`, a workflow applies
+migrations and deploys the backend. A scheduled workflow runs the background jobs every 15
+minutes and resets the demo daily, since free hosts don't run worker processes. Step-by-step
+guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 See [backend/README.md](backend/README.md) for backend details and settings.
