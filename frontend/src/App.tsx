@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 
 import { AuthProvider } from './auth/AuthProvider'
-import { RequireAuth, RequireRole, RoleRedirect } from './auth/guards'
+import { RequireAuth, RequireRole } from './auth/guards'
 import { AppShell } from './components/AppShell'
 import { ApiError } from './lib/api'
 import { AdminActivity } from './pages/admin/AdminActivity'
@@ -12,6 +12,7 @@ import { AdminOrders } from './pages/admin/AdminOrders'
 import { BusinessOrders } from './pages/business/BusinessOrders'
 import { NewOrderPage } from './pages/business/NewOrderPage'
 import { DriverHome } from './pages/driver/DriverHome'
+import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
@@ -26,6 +27,7 @@ const queryClient = new QueryClient({
 })
 
 const router = createBrowserRouter([
+  { path: '/', element: <LandingPage /> },
   { path: '/login', element: <LoginPage /> },
   {
     element: <RequireAuth />,
@@ -33,7 +35,6 @@ const router = createBrowserRouter([
       {
         element: <AppShell />,
         children: [
-          { index: true, element: <RoleRedirect /> },
           {
             path: 'admin',
             element: <RequireRole role="admin" />,

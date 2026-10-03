@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './api'
-import type { AuditEntry, Order, OrderDetail, Page } from './types'
+import type { AuditEntry, DemoInfo, Order, OrderDetail, Page } from './types'
 
 type OrderQuery = Record<string, string | number | boolean | string[] | undefined>
 
@@ -43,5 +43,15 @@ export function useOrderAction<TArgs, TResult = unknown>(run: (args: TArgs) => P
         queryClient.invalidateQueries({ queryKey: [key] })
       }
     },
+  })
+}
+
+/** Whether one-click demo logins are available (demo mode on and data seeded). */
+export function useDemoInfo() {
+  return useQuery({
+    queryKey: ['auth', 'demo'],
+    queryFn: () => api<DemoInfo>('/auth/demo'),
+    staleTime: Infinity,
+    retry: false,
   })
 }

@@ -23,9 +23,3 @@ export function RequireRole({ role }: { role: Role }) {
   if (user.role !== role) return <Navigate to={homePath[user.role]} replace />
   return <Outlet />
 }
-
-/** "/" sends each user to the home of their role. */
-export function RoleRedirect() {
-  const { user } = useAuth()
-  return user ? <Navigate to={homePath[user.role]} replace /> : null
-}

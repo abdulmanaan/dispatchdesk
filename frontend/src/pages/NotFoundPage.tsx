@@ -7,7 +7,7 @@ export function NotFoundPage() {
         <h1 className="text-[28px] font-semibold tracking-tight">Page not found</h1>
         <p className="text-muted">This address does not match any page.</p>
         <Link to="/" className="mt-2 font-semibold text-accent hover:text-accent-hover">
-          Go to your home page
+          Go to the home page
         </Link>
       </div>
     </div>
